@@ -53,9 +53,20 @@ namespace OnlineTest.Services.Validators
 
             //check that current user has access to this exam or no!
             var userExam = await context.ExamUsers.AsNoTracking()
-                                                .AnyAsync(x => x.UserId == userIdentity.UserId && x.ExamId == exam.Id, cancellationToken);
-            if (!userExam)
+                                                .Where(x => x.UserId == userIdentity.UserId && x.ExamId == exam.Id)
+                                                .Select(x => new
+                                                {
+                                                    x.IsEnded,
+                                                    x.IsFinilized,
+                                                    x.IsParticipated
+                                                })
+                                                .FirstOrDefaultAsync(cancellationToken);
+            if (userExam == null)
                 throw new AppException(MessagesDictionary.UserExamAccessErrorMessage);
+
+            //Check that the user has already passed this exam?
+            if (userExam.IsFinilized || userExam.IsEnded)
+                throw new AppException(MessagesDictionary.RepeatExamErrorMessage);
         }
 
 
@@ -89,9 +100,19 @@ namespace OnlineTest.Services.Validators
             //check that current user has access to this exam or no!
             var userExam = await context.ExamUsers.AsNoTracking()
                                                 .Where(x => x.UserId == userIdentity.UserId && x.ExamId == exam.Id)
+                                                .Select(x => new
+                                                {
+                                                    x.IsEnded,
+                                                    x.IsFinilized,
+                                                    x.IsParticipated
+                                                })
                                                 .FirstOrDefaultAsync(cancellationToken);
             if (userExam == null)
                 throw new AppException(MessagesDictionary.UserExamAccessErrorMessage);
+
+            //Check that the user has already started this exam?
+            if (!userExam.IsParticipated)
+                throw new AppException(MessagesDictionary.StartExamErrorMessage);
 
             //Check that the user has already passed this exam?
             if (userExam.IsFinilized || userExam.IsEnded)
@@ -99,13 +120,22 @@ namespace OnlineTest.Services.Validators
 
             //fetch exam questions and user submitted questions for comparison
             var questionUids = inputModel.Answers.Select(x => x.QuestionUid).ToList();
-            var questionIds = await context.ExamQuestions.AsNoTracking()
+            var questions = await context.ExamQuestions.AsNoTracking()
+                                                     .Include(x => x.Question)
                                                      .Where(x => x.ExamId == exam.Id)
-                                                     .Select(x => x.QuestionId)
+                                                     .Select(x => new
+                                                     {
+                                                         x.QuestionId,
+                                                         QuestionUid = x.Question.Uid
+                                                     })
                                                      .ToListAsync(cancellationToken);
             //if exam questions count not equal to user submitted questions
             //that means user not send all exam questions or sened question from another exam
-            if (questionIds.Count != questionUids.Count)
+            if (questions.Count != questionUids.Count)
+                throw new AppException(MessagesDictionary.QuestionNotFoundErrorMessage);
+
+            var existenceOfQuestions = questions.Select(x => questionUids.Contains(x.QuestionUid) ? true : false).Distinct().ToList();
+            if (existenceOfQuestions.Contains(false))
                 throw new AppException(MessagesDictionary.QuestionNotFoundErrorMessage);
 
             //Check Question Options is correct! selected option of question are exist in database or no?

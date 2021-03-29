@@ -26,6 +26,7 @@ namespace OnlineTest.Base
         public const string ExamEndTimeErrorMessage = "TheTestHasExpired";
         public const string UserExamAccessErrorMessage = "YouDoNotHavePermissionToAccessThisExam";
         public const string RepeatExamErrorMessage = "YouHaveTakenThisTestOnce";
+        public const string StartExamErrorMessage = "PleaseFirstStartTheExamAndThenSendAnswers";
         public const string QuestionNotFoundErrorMessage = "PleaseFillAllQuestionOfThisExam";
         public const string OptionNotFoundErrorMessage = "SelectedOptionNotFound";
 
